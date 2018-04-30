@@ -1,0 +1,78 @@
+proc freq data=all;table seer_stage D_AJCC_S2; run;
+proc lifetest data=all plots=survival(test atrisk=0 to 396 by 12);
+      format seer_stage stage.;
+      time surv_mon * Status(0);
+	  strata race3c / test=logrank adjust=sidak;
+      where put(HISTO3V, hisG.) ='Kaposi Sarcoma';
+run;
+proc lifetest data=all plots=survival(test atrisk=0 to 396 by 12);
+      format seer_stage stage.;
+      time surv_mon * Status(0);
+	  strata race3c / test=logrank adjust=sidak;
+      where put(HISTO3V, hisG.) ='Non-Hodgkin Lymphoma';
+run;
+proc lifetest data=all plots=survival(test atrisk=0 to 396 by 12);
+      format seer_stage stage.;
+      time surv_mon * Status(0);
+      where put (HISTO3V, hisG.)='Non-Hodgkin Lymphoma';
+run;
+   proc lifetest data=all plots=survival(atrisk=0 to 396 by 12);
+      format seer_stage stage.;
+      time surv_mon * Status(0);
+      strata seer_stage HISTO3V/ test=logrank adjust=sidak;
+      run;
+PROC PHREG data=analydat;
+model inhosp*censor(0)=expose1-expose6
+pwhsp status1 sex1 age1-age3 ms1
+paygr1-paygr2 oc_cat1-oc_cat9 ccep
+ / rl ties=efron ;
+title1 'Cox regression with exposure
+ status in the model';
+run; 
+%macro cox(data,var);
+proc phreg data=&data;
+   class &var ;
+   model surv_mon*Status(0) = &var  ;
+   hazardratio "Hazard Ratio &var." &var;
+run;
+%mend;
+%let datal= ks nhl all;
+%let varl= sex race3c NHIAREC kriegerSF3 age ins7cU;
+%macro uni;
+data _null_;
+do i 1to 2;
+ call symputx(scan( &datal.,i),data2);
+   do t 1 to 6;
+     call symputx(scan( &varl.,t),var2);
+	 if _n_ >1 then
+      %cox(&data2.,&var2.);
+	  end;
+end;
+%mend;
+%cox(ks,sex);
+%cox(nhl,sex);
+%cox(ks,race3c);
+%cox(nhl,race3c);
+%cox(ks,NHIAREC);
+%cox(nhl,NHIAREC);
+%cox(ks,kriegerSF3);
+%cox(nhl,kriegerSF3);
+%cox(ks,ins7cU);
+%cox(nhl,ins7cU);
+proc phreg data=all;
+
+   class sex race3c NHIAREC kriegerSF3 age ins7cU;
+   model surv_mon*Status(0) = sex race3c NHIAREC kriegerSF3 age ins7cU;
+   *bayes seed=1  statistics=(summary interval);
+   hazardratio 'Hazard Ratio Statement 1' sex;
+   hazardratio 'Hazard Ratio Statement 2' age / unit=10;
+   hazardratio 'Hazard Ratio Statement 3' race3c;
+   hazardratio 'Hazard Ratio Statement 4' NHIAREC;
+   hazardratio 'Hazard Ratio Statement 5' kriegerSF3;
+hazardratio 'Hazard Ratio Statement 6' ins7cU;
+run;
+proc freq data=nhl;
+ format seer_stage stage.;
+table age*seer_stage  /nocol nopct chisq;
+*sex race3c NHIAREC kriegerSF3 ins7cU age;
+run;
